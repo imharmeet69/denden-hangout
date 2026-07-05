@@ -4,8 +4,6 @@ import { Server, Socket } from 'socket.io';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 
-const MAX_USERS_PER_ROOM = 50;
-
 async function startServer() {
   const app = express();
   const server = createServer(app);
@@ -13,54 +11,79 @@ async function startServer() {
     cors: { origin: '*' }
   });
 
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   // Track active rooms and their user counts for fast lookup
   const shardCounts = new Map<string, number>();
+  
+  // Track messages per shard for chat history
+  const shardMessages = new Map<string, any[]>();
   
   // Track which shard each user is in
   const socketToShard = new Map<string, string>();
 
   function getAvailableShard(): string {
-    for (const [shardName, count] of shardCounts.entries()) {
-      if (count < MAX_USERS_PER_ROOM) {
-        return shardName;
-      }
+    const shardName = 'global_shard';
+    if (!shardCounts.has(shardName)) {
+      shardCounts.set(shardName, 0);
     }
-    // Generate a new shard if all active ones are full or if none exist
-    let newShardIndex = 1;
-    let newShardId = `global_shard_${newShardIndex}`;
-    while (shardCounts.has(newShardId)) {
-      newShardIndex++;
-      newShardId = `global_shard_${newShardIndex}`;
-    }
-    
-    shardCounts.set(newShardId, 0);
-    console.log(`Generated new shard: ${newShardId}`);
-    return newShardId;
+    return shardName;
   }
 
   io.on('connection', (socket: Socket) => {
-    // 1. Assign to a shard
+    // 1. Get deviceId from handshake
+    const deviceId = socket.handshake.auth?.deviceId;
+    const deviceRoom = deviceId ? `device_${deviceId}` : `device_${socket.id}`; // Fallback if missing
+
+    // 2. Assign to a shard
     const shard = getAvailableShard();
     
-    // 2. Join the room
+    // 3. Join the rooms (Public Shard + Private Device Room)
     socket.join(shard);
+    socket.join(deviceRoom);
     
-    // 3. Update state
+    // 4. Update state
     socketToShard.set(socket.id, shard);
     shardCounts.set(shard, (shardCounts.get(shard) || 0) + 1);
 
-    // 4. Notify user which shard they are in
+    // 5. Notify user which shard they are in
     socket.emit('assigned_shard', shard);
 
-    console.log(`User ${socket.id} joined ${shard}. Users in shard: ${shardCounts.get(shard)}`);
+    // 6. Send chat history
+    const history = shardMessages.get(shard) || [];
+    // Mark messages as isSelf if they were sent by this deviceId
+    const personalizedHistory = history.map(msg => ({
+      ...msg,
+      isSelf: msg.deviceId === deviceId
+    }));
+    // Clean history before sending (remove deviceId)
+    const cleanHistory = personalizedHistory.map(({ deviceId, ...safeMsg }) => safeMsg);
+    socket.emit('chat_history', cleanHistory);
+
+    console.log(`User ${socket.id} joined ${shard} and ${deviceRoom}. Users in shard: ${shardCounts.get(shard)}`);
 
     // Handle messages
     socket.on('send_message', (payload) => {
-      // payload expects: { id: string, text: string, sender: string, timestamp: number }
-      // Broadcast to all users in the specific shard
-      io.to(shard).emit('new_message', payload);
+      // Create a clean payload with only safe data
+      const cleanPayload = {
+        id: payload.id,
+        text: payload.text,
+        sender: payload.sender,
+        timestamp: payload.timestamp
+      };
+
+      // Save to history
+      const msgForHistory = { ...cleanPayload, deviceId: socket.handshake.auth?.deviceId };
+      if (!shardMessages.has(shard)) {
+        shardMessages.set(shard, []);
+      }
+      shardMessages.get(shard)!.push(msgForHistory);
+
+      // Broadcast to all OTHER users in the specific shard
+      socket.to(shard).except(deviceRoom).emit('new_message', cleanPayload);
+
+      // Emit to all tabs of the SAME user in their private device room with isSelf flag
+      io.to(deviceRoom).emit('new_message', { ...cleanPayload, isSelf: true });
     });
 
     // Handle disconnects gracefully
@@ -73,6 +96,7 @@ async function startServer() {
         if (currentCount <= 0) {
           // Clean up empty rooms to avoid memory leaks
           shardCounts.delete(userShard);
+          shardMessages.delete(userShard);
           console.log(`Shard ${userShard} is empty and was cleaned up.`);
         } else {
           shardCounts.set(userShard, currentCount);

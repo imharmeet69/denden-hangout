@@ -5,11 +5,11 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Send, Users } from 'lucide-react';
+import { Send, Users, ChevronRight, MessageSquare, Shield, Zap } from 'lucide-react';
 import { ChatMessage } from './types';
 
-// Connect to the same origin; our socket.io server is attached to the Express app
-const SOCKET_URL = window.location.origin;
+// Connect to the backend provided by environment variable, or fallback to the same origin
+const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
 
 export default function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -34,19 +34,33 @@ export default function App() {
     sessionStorage.setItem('den_den_username', newName);
     return newName;
   });
+
+  const [deviceId] = useState(() => {
+    let savedId = localStorage.getItem('den_den_device_id');
+    if (!savedId) {
+      savedId = crypto.randomUUID();
+      localStorage.setItem('den_den_device_id', savedId);
+    }
+    return savedId;
+  });
   
+  const [showIntro, setShowIntro] = useState(() => {
+    return !sessionStorage.getItem('den_den_intro_seen');
+  });
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Save messages to local storage whenever they change (keep last 100)
+  // Save messages to local storage whenever they change
   useEffect(() => {
-    localStorage.setItem('den_den_messages', JSON.stringify(messages.slice(-100)));
+    localStorage.setItem('den_den_messages', JSON.stringify(messages));
   }, [messages]);
 
   useEffect(() => {
     // Initialize Socket Connection
     const newSocket = io(SOCKET_URL, {
       path: '/socket.io/',
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      auth: { deviceId }
     });
 
     setSocket(newSocket);
@@ -62,6 +76,10 @@ export default function App() {
 
     newSocket.on('assigned_shard', (assignedShard: string) => {
       setShard(assignedShard);
+    });
+
+    newSocket.on('chat_history', (history: ChatMessage[]) => {
+      setMessages(history);
     });
 
     newSocket.on('new_message', (message: ChatMessage) => {
@@ -95,21 +113,84 @@ export default function App() {
       timestamp: Date.now(),
     };
 
-    // Emit the message to the server, which will broadcast it to the room
+    // Emit the message to the server
     socket.emit('send_message', newMsg);
     setInputText('');
   };
 
+  const handleStart = () => {
+    sessionStorage.setItem('den_den_intro_seen', 'true');
+    setShowIntro(false);
+  };
+
+  if (showIntro) {
+    return (
+      <div className="flex flex-col min-h-screen bg-slate-50 text-slate-900 font-sans items-center justify-center p-4 sm:p-8">
+        <div className="max-w-xl w-full bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+          <div className="p-6 sm:p-10 space-y-6 sm:space-y-8">
+            <div className="text-center space-y-2 sm:space-y-3">
+              <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-blue-50 text-blue-600 mb-2">
+                <MessageSquare className="w-6 h-6 sm:w-8 sm:h-8" />
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Welcome to Den Den</h1>
+              <p className="text-base sm:text-lg text-slate-500">A massive multiplayer real-time chat experience.</p>
+            </div>
+            
+            <div className="space-y-4 sm:space-y-6">
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="flex-none p-2 rounded-xl bg-indigo-50 text-indigo-600">
+                  <Shield className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900">Fully Anonymous</h3>
+                  <p className="text-sm sm:text-base text-slate-500 mt-0.5 sm:mt-1 leading-relaxed">You get a random username every session. No accounts, no emails, no tracking.</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="flex-none p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                  <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900">Massive Multiplayer</h3>
+                  <p className="text-sm sm:text-base text-slate-500 mt-0.5 sm:mt-1 leading-relaxed">Join a global room with everyone else. One big chaotic, fun conversation.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="flex-none p-2 rounded-xl bg-amber-50 text-amber-600">
+                  <Zap className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900">Lightning Fast</h3>
+                  <p className="text-sm sm:text-base text-slate-500 mt-0.5 sm:mt-1 leading-relaxed">Powered by WebSockets, messages appear instantly across all devices.</p>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onClick={handleStart}
+              className="w-full flex items-center justify-center gap-2 py-3.5 sm:py-4 px-6 rounded-2xl bg-blue-600 text-white font-semibold text-base sm:text-lg hover:bg-blue-500 transition-all hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-md"
+            >
+              Next
+              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-screen bg-neutral-950 text-neutral-100 font-sans">
+    <div className="flex flex-col h-screen bg-slate-100 text-slate-900 font-sans">
       {/* Top Navigation / Header */}
-      <header className="flex-none px-6 py-4 border-b border-neutral-800 bg-neutral-900/50 backdrop-blur-md sticky top-0 z-10 flex items-center justify-between">
+      <header className="flex-none px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-slate-50/80 backdrop-blur-md sticky top-0 z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-white">Den Den</h1>
-          <p className="text-sm text-neutral-400 mt-1">Massive Multiplayer Real-time Chat</p>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Den Den</h1>
+          <p className="text-sm text-slate-500 mt-0.5 sm:mt-1">Massive Multiplayer Real-time Chat</p>
         </div>
         
-        <div className="flex items-center gap-4 bg-neutral-900 px-4 py-2 rounded-full border border-neutral-800 shadow-sm">
+        <div className="flex items-center gap-3 sm:gap-4 bg-slate-50 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-slate-200 shadow-sm self-end sm:self-auto">
           <div className="flex items-center gap-2">
             <div 
               className={`w-2.5 h-2.5 rounded-full ${
@@ -118,12 +199,12 @@ export default function App() {
                   : 'bg-red-500'
               }`} 
             />
-            <span className="text-sm font-medium text-neutral-300">
+            <span className="text-sm font-medium text-slate-700">
               {isConnected ? 'Online' : 'Offline'}
             </span>
           </div>
-          <div className="w-px h-4 bg-neutral-800 mx-0.5" />
-          <div className="flex items-center gap-2 text-neutral-400">
+          <div className="w-px h-4 bg-slate-300 mx-0.5" />
+          <div className="flex items-center gap-2 text-slate-500">
             <Users size={16} />
             <span className="text-sm font-mono tracking-tight">{shard}</span>
           </div>
@@ -131,36 +212,36 @@ export default function App() {
       </header>
 
       {/* Messages Viewport */}
-      <main className="flex-1 overflow-y-auto p-6 space-y-5">
+      <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5">
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-neutral-500">
-            <div className="bg-neutral-900/50 p-6 rounded-2xl border border-neutral-800 text-center max-w-sm">
-              <Users size={32} className="mx-auto mb-4 text-neutral-600" />
-              <p className="text-neutral-300 font-medium">Connected to {shard}</p>
-              <p className="text-sm mt-2 text-neutral-500 leading-relaxed">
-                You are in a localized shard of up to 50 users. 
-                Say hello to your room!
+          <div className="h-full flex flex-col items-center justify-center text-slate-500 p-4">
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm text-center max-w-sm">
+              <Users size={32} className="mx-auto mb-4 text-slate-400" />
+              <p className="text-slate-700 font-medium">Connected to {shard}</p>
+              <p className="text-sm mt-2 text-slate-500 leading-relaxed">
+                You are in a massive multiplayer real-time chat. 
+                Say hello to everyone!
               </p>
             </div>
           </div>
         ) : (
           messages.map((msg) => {
-            const isMe = msg.sender === username;
+            const isMe = msg.isSelf;
             return (
               <div 
                 key={msg.id} 
-                className={`flex flex-col max-w-[75%] ${
+                className={`flex flex-col max-w-[85%] sm:max-w-[75%] ${
                   isMe ? 'items-end self-end ml-auto' : 'items-start mr-auto'
                 }`}
               >
-                <span className="text-xs text-neutral-500 mb-1.5 px-1 font-medium">
+                <span className="text-xs text-slate-500 mb-1 sm:mb-1.5 px-1 font-medium">
                   {msg.sender}
                 </span>
                 <div 
-                  className={`px-4 py-2.5 rounded-2xl shadow-sm ${
+                  className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl shadow-sm text-[15px] sm:text-base ${
                     isMe 
                       ? 'bg-blue-600 text-white rounded-br-sm' 
-                      : 'bg-neutral-800 text-neutral-100 rounded-bl-sm border border-neutral-700/50'
+                      : 'bg-slate-50 text-slate-900 rounded-bl-sm border border-slate-200'
                   }`}
                 >
                   <p className="leading-relaxed whitespace-pre-wrap break-words">
@@ -175,25 +256,25 @@ export default function App() {
       </main>
 
       {/* Input Console */}
-      <footer className="flex-none p-4 pb-6 bg-neutral-950 border-t border-neutral-800">
+      <footer className="flex-none p-3 sm:p-4 pb-4 sm:pb-6 bg-slate-100 border-t border-slate-200">
         <div className="max-w-4xl mx-auto">
           <form 
             onSubmit={handleSendMessage}
-            className="flex items-center gap-2 bg-neutral-900 border border-neutral-700 hover:border-neutral-600 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 rounded-full p-1.5 transition-all shadow-sm"
+            className="flex items-center gap-2 bg-slate-50 border border-slate-300 hover:border-slate-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 rounded-full p-1 sm:p-1.5 transition-all shadow-sm"
           >
             <input
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Type a message to your shard..."
-              className="flex-1 bg-transparent border-none outline-none px-4 py-2 text-neutral-100 placeholder:text-neutral-500 font-medium"
+              placeholder="Type a message..."
+              className="flex-1 bg-transparent border-none outline-none px-3 sm:px-4 py-2 text-slate-900 placeholder:text-slate-400 font-medium text-[15px] sm:text-base"
               disabled={!isConnected}
               autoComplete="off"
             />
             <button
               type="submit"
               disabled={!inputText.trim() || !isConnected}
-              className="p-2.5 rounded-full bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:bg-neutral-800 disabled:text-neutral-500 transition-all cursor-pointer disabled:cursor-not-allowed"
+              className="p-2 sm:p-2.5 rounded-full bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:bg-slate-300 disabled:text-slate-500 transition-all cursor-pointer disabled:cursor-not-allowed"
             >
               <Send size={18} className="translate-x-[-1px] translate-y-[1px]" />
             </button>

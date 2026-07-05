@@ -3,4 +3,5 @@ export interface ChatMessage {
   text: string;
   sender: string;
   timestamp: number;
+  isSelf?: boolean;
 }
