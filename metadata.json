@@ -1,0 +1,6 @@
+{
+  "name": "Den Den",
+  "description": "Real-time global chat with dynamic sharding using Node.js and Socket.io",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
