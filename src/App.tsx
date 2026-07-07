@@ -25,6 +25,7 @@ export default function App() {
   const [inputText, setInputText] = useState('');
   const [shard, setShard] = useState<string>('Connecting...');
   const [isConnected, setIsConnected] = useState(false);
+  const [onlineCount, setOnlineCount] = useState<number>(0);
   
   // Assign a random username for this session (persists on refresh, resets on close)
   const [username] = useState(() => {
@@ -82,6 +83,10 @@ export default function App() {
       setMessages(history);
     });
 
+    newSocket.on('user_count', (count: number) => {
+      setOnlineCount(count);
+    });
+
     newSocket.on('new_message', (message: ChatMessage) => {
       // Use functional state update to ensure we always append to latest state
       setMessages((prev) => {
@@ -129,10 +134,13 @@ export default function App() {
         <div className="max-w-xl w-full bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
           <div className="p-6 sm:p-10 space-y-6 sm:space-y-8">
             <div className="text-center space-y-2 sm:space-y-3">
-              <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-blue-50 text-blue-600 mb-2">
-                <MessageSquare className="w-6 h-6 sm:w-8 sm:h-8" />
+              <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white shadow-sm border border-slate-100 mb-2 overflow-hidden relative">
+                <img src="/logo.png" alt="JustChat Logo" className="absolute inset-0 w-full h-full object-cover scale-125" onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.parentElement!.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-square w-8 h-8 sm:w-10 sm:h-10 text-blue-600"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+                }} />
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Welcome to Den Den</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Welcome to JustChat</h1>
               <p className="text-base sm:text-lg text-slate-500">A massive multiplayer real-time chat experience.</p>
             </div>
             
@@ -156,16 +164,6 @@ export default function App() {
                   <p className="text-sm sm:text-base text-slate-500 mt-0.5 sm:mt-1 leading-relaxed">Join a global room with everyone else. One big chaotic, fun conversation.</p>
                 </div>
               </div>
-
-              <div className="flex items-start gap-3 sm:gap-4">
-                <div className="flex-none p-2 rounded-xl bg-amber-50 text-amber-600">
-                  <Zap className="w-5 h-5 sm:w-6 sm:h-6" />
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-semibold text-slate-900">Lightning Fast</h3>
-                  <p className="text-sm sm:text-base text-slate-500 mt-0.5 sm:mt-1 leading-relaxed">Powered by WebSockets, messages appear instantly across all devices.</p>
-                </div>
-              </div>
             </div>
 
             <button 
@@ -184,29 +182,43 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen bg-slate-100 text-slate-900 font-sans">
       {/* Top Navigation / Header */}
-      <header className="flex-none px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-slate-50/80 backdrop-blur-md sticky top-0 z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Den Den</h1>
-          <p className="text-sm text-slate-500 mt-0.5 sm:mt-1">Massive Multiplayer Real-time Chat</p>
+      <header className="flex-none px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-slate-50/80 backdrop-blur-md sticky top-0 z-10 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0">
+        <div className="flex-1 min-w-0 self-start sm:self-auto flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full shadow-sm bg-white overflow-hidden border border-slate-200 flex items-center justify-center shrink-0">
+            <img src="/logo.png" alt="JustChat" className="w-full h-full object-cover scale-125" onError={(e) => e.currentTarget.parentElement!.style.display = 'none'} />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 truncate">JustChat</h1>
+            <p className="text-sm text-slate-500 mt-0.5 sm:mt-1 truncate">One giant room. Zero chill.</p>
+          </div>
         </div>
         
-        <div className="flex items-center gap-3 sm:gap-4 bg-slate-50 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-slate-200 shadow-sm self-end sm:self-auto">
-          <div className="flex items-center gap-2">
-            <div 
-              className={`w-2.5 h-2.5 rounded-full ${
-                isConnected 
-                  ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' 
-                  : 'bg-red-500'
-              }`} 
-            />
-            <span className="text-sm font-medium text-slate-700">
-              {isConnected ? 'Online' : 'Offline'}
-            </span>
+        {isConnected && (
+          <div className="flex-none flex items-center justify-center bg-white border border-slate-200 shadow-sm px-4 py-1.5 rounded-full">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></div>
+            <span className="text-sm font-medium text-slate-700">{onlineCount} online</span>
           </div>
-          <div className="w-px h-4 bg-slate-300 mx-0.5" />
-          <div className="flex items-center gap-2 text-slate-500">
-            <Users size={16} />
-            <span className="text-sm font-mono tracking-tight">{shard}</span>
+        )}
+
+        <div className="flex-1 flex justify-end self-end sm:self-auto">
+          <div className="flex items-center gap-3 sm:gap-4 bg-slate-50 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2">
+              <div 
+                className={`w-2.5 h-2.5 rounded-full ${
+                  isConnected 
+                    ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' 
+                    : 'bg-red-500'
+                }`} 
+              />
+              <span className="text-sm font-medium text-slate-700">
+                {isConnected ? 'Online' : 'Offline'}
+              </span>
+            </div>
+            <div className="w-px h-4 bg-slate-300 mx-0.5" />
+            <div className="flex items-center gap-2 text-slate-500">
+              <Users size={16} />
+              <span className="text-sm font-mono tracking-tight truncate max-w-[100px]">{shard}</span>
+            </div>
           </div>
         </div>
       </header>
@@ -217,10 +229,12 @@ export default function App() {
           <div className="h-full flex flex-col items-center justify-center text-slate-500 p-4">
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm text-center max-w-sm">
               <Users size={32} className="mx-auto mb-4 text-slate-400" />
-              <p className="text-slate-700 font-medium">Connected to {shard}</p>
+              <p className="text-slate-700 font-medium">
+                {isConnected ? `Connected to ${shard}` : shard}
+              </p>
               <p className="text-sm mt-2 text-slate-500 leading-relaxed">
-                You are in a massive multiplayer real-time chat. 
-                Say hello to everyone!
+                You've just dropped into the wildest global chat room! 
+                Start typing to make some noise!
               </p>
             </div>
           </div>

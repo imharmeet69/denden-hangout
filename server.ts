@@ -45,6 +45,7 @@ async function startServer() {
     // 4. Update state
     socketToShard.set(socket.id, shard);
     shardCounts.set(shard, (shardCounts.get(shard) || 0) + 1);
+    io.to(shard).emit('user_count', shardCounts.get(shard));
 
     // 5. Notify user which shard they are in
     socket.emit('assigned_shard', shard);
@@ -101,6 +102,7 @@ async function startServer() {
         } else {
           shardCounts.set(userShard, currentCount);
           console.log(`User ${socket.id} left ${userShard}. Users left: ${currentCount}`);
+          io.to(userShard).emit('user_count', currentCount);
         }
       }
     });
