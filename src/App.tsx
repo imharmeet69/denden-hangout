@@ -135,7 +135,7 @@ export default function App() {
           <div className="p-6 sm:p-10 space-y-6 sm:space-y-8">
             <div className="text-center space-y-2 sm:space-y-3">
               <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white shadow-sm border border-slate-100 mb-2 overflow-hidden relative">
-                <img src="/logo.png" alt="JustChat Logo" className="absolute inset-0 w-full h-full object-cover scale-125" onError={(e) => {
+                <img src="/logo.svg" alt="JustChat Logo" className="absolute inset-0 w-full h-full object-cover scale-125" onError={(e) => {
                   e.currentTarget.style.display = 'none';
                   e.currentTarget.parentElement!.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-square w-8 h-8 sm:w-10 sm:h-10 text-blue-600"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
                 }} />
@@ -185,7 +185,7 @@ export default function App() {
       <header className="flex-none px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-slate-50/80 backdrop-blur-md sticky top-0 z-10 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0">
         <div className="flex-1 min-w-0 self-start sm:self-auto flex items-center gap-3">
           <div className="w-10 h-10 rounded-full shadow-sm bg-white overflow-hidden border border-slate-200 flex items-center justify-center shrink-0">
-            <img src="/logo.png" alt="JustChat" className="w-full h-full object-cover scale-125" onError={(e) => e.currentTarget.parentElement!.style.display = 'none'} />
+            <img src="/logo.svg" alt="JustChat" className="w-full h-full object-cover scale-125" onError={(e) => e.currentTarget.parentElement!.style.display = 'none'} />
           </div>
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight text-slate-900 truncate">JustChat</h1>
