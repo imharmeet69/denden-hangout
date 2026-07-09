@@ -5,8 +5,9 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Send, Users, ChevronRight, MessageSquare, Shield, Zap } from 'lucide-react';
+import { Send, Users, ChevronRight, MessageSquare, Shield, Zap, Image as ImageIcon } from 'lucide-react';
 import { ChatMessage } from './types';
+import { GifPicker } from './components/GifPicker';
 
 // Connect to the backend provided by environment variable, or fallback to the same origin
 const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
@@ -26,6 +27,7 @@ export default function App() {
   const [shard, setShard] = useState<string>('Connecting...');
   const [isConnected, setIsConnected] = useState(false);
   const [onlineCount, setOnlineCount] = useState<number>(0);
+  const [showGifPicker, setShowGifPicker] = useState(false);
   
   // Assign a random username for this session (persists on refresh, resets on close)
   const [username] = useState(() => {
@@ -121,6 +123,22 @@ export default function App() {
     // Emit the message to the server
     socket.emit('send_message', newMsg);
     setInputText('');
+  };
+
+  const handleSendGif = (gif: { url: string; aspect: number }) => {
+    if (!socket || !isConnected) return;
+
+    const newMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      text: '', // Empty text for gif only
+      sender: username,
+      timestamp: Date.now(),
+      gifUrl: gif.url,
+      gifAspect: gif.aspect,
+    };
+
+    socket.emit('send_message', newMsg);
+    setShowGifPicker(false);
   };
 
   const handleStart = () => {
@@ -241,6 +259,7 @@ export default function App() {
         ) : (
           messages.map((msg) => {
             const isMe = msg.isSelf;
+            const isGif = !!msg.gifUrl;
             return (
               <div 
                 key={msg.id} 
@@ -248,19 +267,34 @@ export default function App() {
                   isMe ? 'items-end self-end ml-auto' : 'items-start mr-auto'
                 }`}
               >
-                <span className="text-xs text-slate-500 mb-1 sm:mb-1.5 px-1 font-medium">
-                  {msg.sender}
-                </span>
+                {!isGif && (
+                  <span className="text-xs text-slate-500 mb-1 sm:mb-1.5 px-1 font-medium">
+                    {msg.sender}
+                  </span>
+                )}
                 <div 
-                  className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl shadow-sm text-[15px] sm:text-base ${
-                    isMe 
-                      ? 'bg-blue-600 text-white rounded-br-sm' 
-                      : 'bg-slate-50 text-slate-900 rounded-bl-sm border border-slate-200'
-                  }`}
+                  className={
+                    isGif 
+                      ? `overflow-hidden rounded-lg shadow-sm ${isMe ? 'rounded-br-sm' : 'rounded-bl-sm'}`
+                      : `px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl shadow-sm text-[15px] sm:text-base ${
+                          isMe 
+                            ? 'bg-blue-600 text-white rounded-br-sm' 
+                            : 'bg-slate-50 text-slate-900 rounded-bl-sm border border-slate-200'
+                        }`
+                  }
                 >
-                  <p className="leading-relaxed whitespace-pre-wrap break-words">
-                    {msg.text}
-                  </p>
+                  {msg.gifUrl ? (
+                    <div 
+                      className="bg-slate-800/10"
+                      style={{ aspectRatio: msg.gifAspect || 1, minWidth: '150px', maxWidth: '300px' }}
+                    >
+                      <img src={msg.gifUrl} alt="GIF" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <p className="leading-relaxed whitespace-pre-wrap break-words">
+                      {msg.text}
+                    </p>
+                  )}
                 </div>
               </div>
             );
@@ -271,17 +305,32 @@ export default function App() {
 
       {/* Input Console */}
       <footer className="flex-none p-3 sm:p-4 pb-4 sm:pb-6 bg-slate-100 border-t border-slate-200">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto relative">
+          {showGifPicker && (
+            <GifPicker 
+              onSelectGif={handleSendGif} 
+              onClose={() => setShowGifPicker(false)} 
+            />
+          )}
           <form 
             onSubmit={handleSendMessage}
             className="flex items-center gap-2 bg-slate-50 border border-slate-300 hover:border-slate-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 rounded-full p-1 sm:p-1.5 transition-all shadow-sm"
           >
+            <button
+              type="button"
+              disabled={!isConnected}
+              onClick={() => setShowGifPicker(!showGifPicker)}
+              className="p-2 sm:p-2.5 rounded-full text-slate-500 hover:text-slate-700 hover:bg-slate-200 disabled:opacity-50 transition-colors"
+              title="Send a GIF"
+            >
+              <ImageIcon size={20} />
+            </button>
             <input
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder="Type a message..."
-              className="flex-1 bg-transparent border-none outline-none px-3 sm:px-4 py-2 text-slate-900 placeholder:text-slate-400 font-medium text-[15px] sm:text-base"
+              className="flex-1 bg-transparent border-none outline-none px-1 sm:px-2 py-2 text-slate-900 placeholder:text-slate-400 font-medium text-[15px] sm:text-base"
               disabled={!isConnected}
               autoComplete="off"
             />

@@ -4,4 +4,6 @@ export interface ChatMessage {
   sender: string;
   timestamp: number;
   isSelf?: boolean;
+  gifUrl?: string;
+  gifAspect?: number;
 }
