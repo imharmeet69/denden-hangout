@@ -18,7 +18,7 @@ export function GifPicker({ onSelectGif, onClose }: GifPickerProps) {
       setLoading(true);
       setError(null);
       try {
-        const backendUrl = import.meta.env.VITE_API_URL || '';
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
         const endpoint = query 
           ? `/api/gifs/search?q=${encodeURIComponent(query)}&limit=30`
           : `/api/gifs/trending?limit=30`;
