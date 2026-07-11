@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import cors from 'cors';
 import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { createServer as createViteServer } from 'vite';
@@ -7,6 +8,27 @@ import path from 'path';
 
 async function startServer() {
   const app = express();
+  
+  // Configure CORS to allow the production frontend, AI Studio preview, and local dev
+  const allowedOrigins = [
+    'https://denden-hangout-frontend.onrender.com',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ];
+  if (process.env.APP_URL) {
+    allowedOrigins.push(process.env.APP_URL);
+  }
+
+  app.use(cors({ 
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.run.app')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
+  }));
+
   const server = createServer(app);
   const io = new Server(server, {
     cors: { origin: '*' }
