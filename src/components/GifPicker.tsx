@@ -18,10 +18,11 @@ export function GifPicker({ onSelectGif, onClose }: GifPickerProps) {
       setLoading(true);
       setError(null);
       try {
+        const backendUrl = import.meta.env.VITE_API_URL || '';
         const endpoint = query 
           ? `/api/gifs/search?q=${encodeURIComponent(query)}&limit=30`
           : `/api/gifs/trending?limit=30`;
-        const res = await fetch(endpoint);
+        const res = await fetch(`${backendUrl}${endpoint}`);
         if (!res.ok) {
           if (res.status === 503) {
              throw new Error('GIPHY_API_KEY is not configured on the server. Please check your environment variables.');

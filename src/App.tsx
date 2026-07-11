@@ -12,8 +12,6 @@ import { GifPicker } from './components/GifPicker';
 // Connect to the backend provided by environment variable, or fallback to the same origin
 const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
 
-console.log("Current Backend URL Target:", import.meta.env.VITE_API_URL);
-
 export default function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
