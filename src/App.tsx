@@ -3,9 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Send, Users, ChevronRight, MessageSquare, Shield, Zap, Image as ImageIcon } from 'lucide-react';
+import { Send, Users, ChevronRight, MessageSquare, Shield, Zap, Image as ImageIcon, Reply, X } from 'lucide-react';
+import { motion, useAnimation, PanInfo } from 'motion/react';
 import { ChatMessage } from './types';
 import { GifPicker } from './components/GifPicker';
 
@@ -28,6 +29,7 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [onlineCount, setOnlineCount] = useState<number>(0);
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   
   // Assign a random username for this session (persists on refresh, resets on close)
   const [username] = useState(() => {
@@ -118,11 +120,18 @@ export default function App() {
       text: inputText.trim(),
       sender: username,
       timestamp: Date.now(),
+      replyTo: replyingTo ? {
+        id: replyingTo.id,
+        text: replyingTo.text,
+        sender: replyingTo.sender,
+        gifUrl: replyingTo.gifUrl,
+      } : undefined
     };
 
     // Emit the message to the server
     socket.emit('send_message', newMsg);
     setInputText('');
+    setReplyingTo(null);
   };
 
   const handleSendGif = (gif: { url: string; aspect: number }) => {
@@ -135,10 +144,17 @@ export default function App() {
       timestamp: Date.now(),
       gifUrl: gif.url,
       gifAspect: gif.aspect,
+      replyTo: replyingTo ? {
+        id: replyingTo.id,
+        text: replyingTo.text,
+        sender: replyingTo.sender,
+        gifUrl: replyingTo.gifUrl,
+      } : undefined
     };
 
     socket.emit('send_message', newMsg);
     setShowGifPicker(false);
+    setReplyingTo(null);
   };
 
   const handleStart = () => {
@@ -261,42 +277,84 @@ export default function App() {
             const isMe = msg.isSelf;
             const isGif = !!msg.gifUrl;
             return (
-              <div 
+              <motion.div 
                 key={msg.id} 
-                className={`flex flex-col max-w-[85%] sm:max-w-[75%] ${
-                  isMe ? 'items-end self-end ml-auto' : 'items-start mr-auto'
+                className={`group flex items-center gap-2 max-w-[85%] sm:max-w-[75%] w-full ${
+                  isMe ? 'self-end ml-auto justify-end' : 'mr-auto justify-start'
                 }`}
-              >
-                {!isGif && (
-                  <span className="text-xs text-slate-500 mb-1 sm:mb-1.5 px-1 font-medium">
-                    {msg.sender}
-                  </span>
-                )}
-                <div 
-                  className={
-                    isGif 
-                      ? `overflow-hidden rounded-lg shadow-sm ${isMe ? 'rounded-br-sm' : 'rounded-bl-sm'}`
-                      : `px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl shadow-sm text-[15px] sm:text-base ${
-                          isMe 
-                            ? 'bg-blue-600 text-white rounded-br-sm' 
-                            : 'bg-slate-50 text-slate-900 rounded-bl-sm border border-slate-200'
-                        }`
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={{ left: 0, right: 0.3 }}
+                onDragEnd={(e, info) => {
+                  if (info.offset.x > 50) {
+                    setReplyingTo(msg);
                   }
-                >
-                  {msg.gifUrl ? (
-                    <div 
-                      className="bg-slate-800/10"
-                      style={{ aspectRatio: msg.gifAspect || 1, minWidth: '150px', maxWidth: '300px' }}
-                    >
-                      <img src={msg.gifUrl} alt="GIF" className="w-full h-full object-cover" />
-                    </div>
-                  ) : (
-                    <p className="leading-relaxed whitespace-pre-wrap break-words">
-                      {msg.text}
-                    </p>
+                }}
+              >
+                {!isMe && (
+                   <button 
+                     onClick={() => setReplyingTo(msg)}
+                     className="hidden md:flex p-1.5 rounded-full bg-slate-200 text-slate-500 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                     title="Reply"
+                   >
+                     <Reply size={14} />
+                   </button>
+                )}
+
+                <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                  {!isGif && (
+                    <span className="text-xs text-slate-500 mb-1 sm:mb-1.5 px-1 font-medium">
+                      {msg.sender}
+                    </span>
                   )}
+                  <div 
+                    className={
+                      isGif 
+                        ? `overflow-hidden rounded-lg shadow-sm ${isMe ? 'rounded-br-sm' : 'rounded-bl-sm'} ${msg.replyTo ? 'p-2 bg-slate-100' : ''}`
+                        : `px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl shadow-sm text-[15px] sm:text-base ${
+                            isMe 
+                              ? 'bg-blue-600 text-white rounded-br-sm' 
+                              : 'bg-slate-50 text-slate-900 rounded-bl-sm border border-slate-200'
+                          }`
+                    }
+                  >
+                    {msg.replyTo && (
+                      <div className={`text-sm p-2 mb-2 rounded-lg border-l-4 ${isMe ? 'bg-slate-800/20 border-slate-800/30 text-white/90' : 'bg-slate-200 border-slate-400 text-slate-700'} `}>
+                        <div className="font-semibold text-xs mb-0.5">{msg.replyTo.sender}</div>
+                        {msg.replyTo.gifUrl ? (
+                          <div className="flex items-center gap-2 text-xs">
+                             <ImageIcon size={14} /> GIF
+                          </div>
+                        ) : (
+                          <div className="truncate max-w-[200px] text-xs opacity-90">{msg.replyTo.text}</div>
+                        )}
+                      </div>
+                    )}
+                    {msg.gifUrl ? (
+                      <div 
+                        className="bg-slate-800/10 rounded-md overflow-hidden"
+                        style={{ aspectRatio: msg.gifAspect || 1, minWidth: '150px', maxWidth: '300px' }}
+                      >
+                        <img src={msg.gifUrl} alt="GIF" className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <p className="leading-relaxed whitespace-pre-wrap break-words">
+                        {msg.text}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+
+                {isMe && (
+                   <button 
+                     onClick={() => setReplyingTo(msg)}
+                     className="hidden md:flex p-1.5 rounded-full bg-slate-200 text-slate-500 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                     title="Reply"
+                   >
+                     <Reply size={14} />
+                   </button>
+                )}
+              </motion.div>
             );
           })
         )}
@@ -306,6 +364,29 @@ export default function App() {
       {/* Input Console */}
       <footer className="flex-none p-3 sm:p-4 pb-4 sm:pb-6 bg-slate-100 border-t border-slate-200">
         <div className="max-w-4xl mx-auto relative">
+          {replyingTo && (
+            <div className="mb-2 bg-slate-50 border border-slate-300 rounded-xl p-3 flex items-start gap-3 shadow-sm relative">
+              <div className="absolute top-2 right-2">
+                 <button 
+                   onClick={() => setReplyingTo(null)}
+                   className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+                 >
+                   <X size={16} />
+                 </button>
+              </div>
+              <div className="w-1 h-10 bg-slate-400 rounded-full flex-none"></div>
+              <div className="flex-1 min-w-0 pr-6">
+                <p className="text-xs font-semibold text-slate-700 mb-0.5">{replyingTo.sender}</p>
+                {replyingTo.gifUrl ? (
+                  <div className="flex items-center gap-1.5 text-slate-500 text-sm">
+                    <ImageIcon size={14} /> GIF
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-600 truncate">{replyingTo.text}</p>
+                )}
+              </div>
+            </div>
+          )}
           {showGifPicker && (
             <GifPicker 
               onSelectGif={handleSendGif} 

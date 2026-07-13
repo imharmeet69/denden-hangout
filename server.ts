@@ -34,7 +34,7 @@ async function startServer() {
     cors: { origin: '*' }
   });
 
-  const PORT = process.env.PORT || 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   // Track active rooms and their user counts for fast lookup
   const shardCounts = new Map<string, number>();
@@ -95,7 +95,8 @@ async function startServer() {
         sender: payload.sender,
         timestamp: payload.timestamp,
         gifUrl: payload.gifUrl,
-        gifAspect: payload.gifAspect
+        gifAspect: payload.gifAspect,
+        replyTo: payload.replyTo
       };
 
       // Save to history

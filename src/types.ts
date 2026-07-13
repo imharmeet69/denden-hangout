@@ -6,4 +6,10 @@ export interface ChatMessage {
   isSelf?: boolean;
   gifUrl?: string;
   gifAspect?: number;
+  replyTo?: {
+    id: string;
+    text: string;
+    sender: string;
+    gifUrl?: string;
+  };
 }
