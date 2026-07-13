@@ -258,7 +258,7 @@ export default function App() {
             <div className="w-px h-4 bg-slate-300 mx-0.5" />
             <div className="flex items-center gap-2 text-slate-500">
               <Users size={16} />
-              <span className="text-sm font-mono tracking-tight truncate max-w-[100px]">{shard}</span>
+              <span className="text-sm tracking-tight truncate max-w-[100px]">Global_Chat</span>
             </div>
           </div>
         </div>
