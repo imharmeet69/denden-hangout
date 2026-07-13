@@ -30,6 +30,11 @@ export default function App() {
   const [onlineCount, setOnlineCount] = useState<number>(0);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+
+  const handleReply = (msg: ChatMessage) => {
+    setReplyingTo(msg);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
   
   // Assign a random username for this session (persists on refresh, resets on close)
   const [username] = useState(() => {
@@ -54,6 +59,7 @@ export default function App() {
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Save messages to local storage whenever they change
   useEffect(() => {
@@ -132,6 +138,7 @@ export default function App() {
     socket.emit('send_message', newMsg);
     setInputText('');
     setReplyingTo(null);
+    inputRef.current?.focus();
   };
 
   const handleSendGif = (gif: { url: string; aspect: number }) => {
@@ -288,13 +295,13 @@ export default function App() {
                 dragDirectionLock
                 onDragEnd={(e, info) => {
                   if (Math.abs(info.offset.x) > 40) {
-                    setReplyingTo(msg);
+                    handleReply(msg);
                   }
                 }}
               >
                 {!isMe && (
                    <button 
-                     onClick={() => setReplyingTo(msg)}
+                     onClick={() => handleReply(msg)}
                      className="hidden md:flex p-1.5 rounded-full bg-slate-200 text-slate-500 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity"
                      title="Reply"
                    >
@@ -348,7 +355,7 @@ export default function App() {
 
                 {isMe && (
                    <button 
-                     onClick={() => setReplyingTo(msg)}
+                     onClick={() => handleReply(msg)}
                      className="hidden md:flex p-1.5 rounded-full bg-slate-200 text-slate-500 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity"
                      title="Reply"
                    >
@@ -408,6 +415,7 @@ export default function App() {
               <ImageIcon size={20} />
             </button>
             <input
+              ref={inputRef}
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
@@ -419,6 +427,7 @@ export default function App() {
             <button
               type="submit"
               disabled={!inputText.trim() || !isConnected}
+              onPointerDown={(e) => e.preventDefault()}
               className="p-2 sm:p-2.5 rounded-full bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:bg-slate-300 disabled:text-slate-500 transition-all cursor-pointer disabled:cursor-not-allowed"
             >
               <Send size={18} className="translate-x-[-1px] translate-y-[1px]" />
