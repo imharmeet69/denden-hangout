@@ -284,9 +284,10 @@ export default function App() {
                 }`}
                 drag="x"
                 dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={{ left: 0, right: 0.3 }}
+                dragElastic={0.2}
+                dragDirectionLock
                 onDragEnd={(e, info) => {
-                  if (info.offset.x > 50) {
+                  if (Math.abs(info.offset.x) > 40) {
                     setReplyingTo(msg);
                   }
                 }}
