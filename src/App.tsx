@@ -108,8 +108,6 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const inputRef = useRef<HTMLDivElement>(null);
-
   const handleSendMessage = (e?: React.FormEvent) => {
     e?.preventDefault();
     
@@ -125,18 +123,6 @@ export default function App() {
     // Emit the message to the server
     socket.emit('send_message', newMsg);
     setInputText('');
-    if (inputRef.current) {
-      inputRef.current.textContent = '';
-    }
-  };
-
-  const uploadToBackend = async (file: File): Promise<string> => {
-    // Faking backend upload by converting to Data URL
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target?.result as string);
-      reader.readAsDataURL(file);
-    });
   };
 
   const handleSendGif = (gif: { url: string; aspect: number }) => {
@@ -339,37 +325,14 @@ export default function App() {
             >
               <ImageIcon size={20} />
             </button>
-            <div
-              ref={inputRef}
-              contentEditable={isConnected}
-              onInput={(e) => setInputText(e.currentTarget.textContent || '')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage(e as any);
-                }
-              }}
-              onPaste={(e) => {
-                const items = e.clipboardData?.items;
-                if (!items) return;
-
-                for (let i = 0; i < items.length; i++) {
-                  const item = items[i];
-                  if (item.type.indexOf('image') !== -1 || item.type.indexOf('gif') !== -1) {
-                    e.preventDefault();
-                    const file = item.getAsFile();
-                    if (file) {
-                      uploadToBackend(file).then(url => {
-                        handleSendGif({ url, aspect: 1 });
-                      }).catch(err => console.error("Upload failed", err));
-                    }
-                    break;
-                  }
-                }
-              }}
-              data-placeholder="Type a message..."
-              className="flex-1 bg-transparent border-none outline-none px-1 sm:px-2 py-2 text-slate-900 font-medium text-[15px] sm:text-base empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 whitespace-pre-wrap cursor-text max-h-32 overflow-y-auto"
-              suppressContentEditableWarning={true}
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Type a message..."
+              className="flex-1 bg-transparent border-none outline-none px-1 sm:px-2 py-2 text-slate-900 placeholder:text-slate-400 font-medium text-[15px] sm:text-base"
+              disabled={!isConnected}
+              autoComplete="off"
             />
             <button
               type="submit"
