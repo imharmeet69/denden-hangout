@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Send, Users, ChevronRight, MessageSquare, Shield, Zap, Image as ImageIcon, Reply, X } from 'lucide-react';
+import { Send, Users, ChevronRight, MessageSquare, Shield, Zap, Image as ImageIcon, Sticker, Reply, X } from 'lucide-react';
 import { motion, useAnimation, PanInfo } from 'motion/react';
 import { ChatMessage } from './types';
 import { GifPicker } from './components/GifPicker';
@@ -131,6 +131,7 @@ export default function App() {
         text: replyingTo.text,
         sender: replyingTo.sender,
         gifUrl: replyingTo.gifUrl,
+        isSticker: replyingTo.isSticker,
       } : undefined
     };
 
@@ -141,7 +142,7 @@ export default function App() {
     inputRef.current?.focus();
   };
 
-  const handleSendGif = (gif: { url: string; aspect: number }) => {
+  const handleSendMedia = (media: { url: string; aspect: number; isSticker?: boolean }) => {
     if (!socket || !isConnected) return;
 
     const newMsg: ChatMessage = {
@@ -149,13 +150,15 @@ export default function App() {
       text: '', // Empty text for gif only
       sender: username,
       timestamp: Date.now(),
-      gifUrl: gif.url,
-      gifAspect: gif.aspect,
+      gifUrl: media.url,
+      gifAspect: media.aspect,
+      isSticker: media.isSticker,
       replyTo: replyingTo ? {
         id: replyingTo.id,
         text: replyingTo.text,
         sender: replyingTo.sender,
         gifUrl: replyingTo.gifUrl,
+        isSticker: replyingTo.isSticker,
       } : undefined
     };
 
@@ -331,7 +334,7 @@ export default function App() {
                         <div className="font-semibold text-xs mb-0.5">{msg.replyTo.sender}</div>
                         {msg.replyTo.gifUrl ? (
                           <div className="flex items-center gap-2 text-xs">
-                             <ImageIcon size={14} /> GIF
+                             {msg.replyTo.isSticker ? <Sticker size={14} /> : <ImageIcon size={14} />} {msg.replyTo.isSticker ? 'Sticker' : 'GIF'}
                           </div>
                         ) : (
                           <div className="truncate max-w-[200px] text-xs opacity-90">{msg.replyTo.text}</div>
@@ -340,10 +343,10 @@ export default function App() {
                     )}
                     {msg.gifUrl ? (
                       <div 
-                        className="bg-slate-800/10 rounded-md overflow-hidden"
+                        className={`rounded-md overflow-hidden ${msg.isSticker ? '' : 'bg-slate-800/10'}`}
                         style={{ aspectRatio: msg.gifAspect || 1, minWidth: '150px', maxWidth: '300px' }}
                       >
-                        <img src={msg.gifUrl} alt="GIF" className="w-full h-full object-cover" />
+                        <img src={msg.gifUrl} alt={msg.isSticker ? 'Sticker' : 'GIF'} className={`w-full h-full ${msg.isSticker ? 'object-contain drop-shadow-md' : 'object-cover'}`} />
                       </div>
                     ) : (
                       <p className="leading-relaxed whitespace-pre-wrap break-words">
@@ -387,7 +390,7 @@ export default function App() {
                 <p className="text-xs font-semibold text-slate-700 mb-0.5">{replyingTo.sender}</p>
                 {replyingTo.gifUrl ? (
                   <div className="flex items-center gap-1.5 text-slate-500 text-sm">
-                    <ImageIcon size={14} /> GIF
+                    {replyingTo.isSticker ? <Sticker size={14} /> : <ImageIcon size={14} />} {replyingTo.isSticker ? 'Sticker' : 'GIF'}
                   </div>
                 ) : (
                   <p className="text-sm text-slate-600 truncate">{replyingTo.text}</p>
@@ -397,7 +400,7 @@ export default function App() {
           )}
           {showGifPicker && (
             <GifPicker 
-              onSelectGif={handleSendGif} 
+              onSelectGif={handleSendMedia} 
               onClose={() => setShowGifPicker(false)} 
             />
           )}
@@ -410,9 +413,9 @@ export default function App() {
               disabled={!isConnected}
               onClick={() => setShowGifPicker(!showGifPicker)}
               className="p-2 sm:p-2.5 rounded-full text-slate-500 hover:text-slate-700 hover:bg-slate-200 disabled:opacity-50 transition-colors"
-              title="Send a GIF"
+              title="Send a GIF or Sticker"
             >
-              <ImageIcon size={20} />
+              <Sticker size={20} />
             </button>
             <input
               ref={inputRef}

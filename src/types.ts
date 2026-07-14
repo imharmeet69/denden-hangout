@@ -6,10 +6,12 @@ export interface ChatMessage {
   isSelf?: boolean;
   gifUrl?: string;
   gifAspect?: number;
+  isSticker?: boolean;
   replyTo?: {
     id: string;
     text: string;
     sender: string;
     gifUrl?: string;
+    isSticker?: boolean;
   };
 }

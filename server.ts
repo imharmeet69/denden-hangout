@@ -96,6 +96,7 @@ async function startServer() {
         timestamp: payload.timestamp,
         gifUrl: payload.gifUrl,
         gifAspect: payload.gifAspect,
+        isSticker: payload.isSticker,
         replyTo: payload.replyTo
       };
 
@@ -181,6 +182,49 @@ async function startServer() {
       res.json(data);
     } catch (e) {
       console.error('Error fetching trending gifs:', e);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Stickers Search Proxy Route
+  app.get('/api/stickers/search', async (req, res) => {
+    try {
+      const apiKey = process.env.GIPHY_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({ error: 'GIPHY_API_KEY is not configured on the server.' });
+      }
+      const query = req.query.q as string || '';
+      const limit = req.query.limit || 20;
+      
+      const response = await fetch(`https://api.giphy.com/v1/stickers/search?api_key=${apiKey}&q=${encodeURIComponent(query)}&limit=${limit}&rating=g`);
+      if (!response.ok) { 
+         return res.status(response.status).json({ error: 'Giphy API error' });
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (e) {
+      console.error('Error fetching stickers:', e);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Stickers Trending Proxy Route
+  app.get('/api/stickers/trending', async (req, res) => {
+    try {
+      const apiKey = process.env.GIPHY_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({ error: 'GIPHY_API_KEY is not configured on the server.' });
+      }
+      const limit = req.query.limit || 20;
+      
+      const response = await fetch(`https://api.giphy.com/v1/stickers/trending?api_key=${apiKey}&limit=${limit}&rating=g`);
+      if (!response.ok) { 
+         return res.status(response.status).json({ error: 'Giphy API error' });
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (e) {
+      console.error('Error fetching trending stickers:', e);
       res.status(500).json({ error: 'Internal server error' });
     }
   });
