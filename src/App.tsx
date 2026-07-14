@@ -162,8 +162,8 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 1024 * 1024) {
-      alert('File size must be under 1MB');
+    if (file.size > 50 * 1024 * 1024) {
+      alert('File size must be under 50MB');
       e.target.value = '';
       return;
     }
