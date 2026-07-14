@@ -13,7 +13,16 @@ import { GifPicker } from './components/GifPicker';
 // Connect to the backend provided by environment variable, or fallback to the same origin
 const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
 
-export default function App() {
+const getFullUrl = (url?: string) => {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
+  return `${backendUrl}${url}`;
+};
+
+export default
+
+function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
@@ -145,7 +154,7 @@ export default function App() {
         sender: replyingTo.sender,
         gifUrl: replyingTo.gifUrl,
         isSticker: replyingTo.isSticker,
-        mediaUrl: replyingTo.mediaUrl,
+        mediaUrl: getFullUrl(replyingTo.mediaUrl),
         mediaType: replyingTo.mediaType,
       } : undefined
     };
@@ -201,7 +210,7 @@ export default function App() {
         text: '',
         sender: username,
         timestamp: Date.now(),
-        mediaUrl: data.url,
+        mediaUrl: data.url.startsWith('http') ? data.url : `${backendUrl}${data.url}`,
         mediaType: data.type,
         replyTo: replyingTo ? {
           id: replyingTo.id,
@@ -209,7 +218,7 @@ export default function App() {
           sender: replyingTo.sender,
           gifUrl: replyingTo.gifUrl,
           isSticker: replyingTo.isSticker,
-          mediaUrl: replyingTo.mediaUrl,
+          mediaUrl: getFullUrl(replyingTo.mediaUrl),
           mediaType: replyingTo.mediaType,
         } : undefined
       };
@@ -243,7 +252,7 @@ export default function App() {
         sender: replyingTo.sender,
         gifUrl: replyingTo.gifUrl,
         isSticker: replyingTo.isSticker,
-        mediaUrl: replyingTo.mediaUrl,
+        mediaUrl: getFullUrl(replyingTo.mediaUrl),
         mediaType: replyingTo.mediaType,
       } : undefined
     };
@@ -371,7 +380,7 @@ export default function App() {
         ) : (
           messages.map((msg) => {
             const isMe = msg.isSelf;
-            const isGif = !!msg.gifUrl || !!msg.mediaUrl;
+            const isGif = !!msg.gifUrl || !!getFullUrl(msg.mediaUrl);
             return (
               <motion.div 
                 key={msg.id} 
@@ -452,16 +461,16 @@ export default function App() {
                           onClick={() => setMaximizedMedia({url: msg.gifUrl!, type: 'image'})}
                         />
                       </div>
-                    ) : msg.mediaUrl ? (
+                    ) : getFullUrl(msg.mediaUrl) ? (
                       <div className="rounded-md overflow-hidden bg-slate-800/10" style={{ minWidth: '150px', maxWidth: '300px' }}>
                         {msg.mediaType === 'video' ? (
-                          <video src={msg.mediaUrl} controls className="w-full h-auto max-h-[400px] object-contain" />
+                          <video src={getFullUrl(msg.mediaUrl)} controls className="w-full h-auto max-h-[400px] object-contain" />
                         ) : (
                           <img 
-                            src={msg.mediaUrl} 
+                            src={getFullUrl(msg.mediaUrl)} 
                             alt="Upload" 
                             className="w-full h-auto max-h-[400px] object-contain cursor-pointer hover:opacity-90 transition-opacity" 
-                            onClick={() => setMaximizedMedia({url: msg.mediaUrl!, type: 'image'})}
+                            onClick={() => setMaximizedMedia({url: getFullUrl(msg.mediaUrl), type: 'image'})}
                           />
                         )}
                       </div>
@@ -509,7 +518,7 @@ export default function App() {
                   <div className="flex items-center gap-1.5 text-slate-500 text-sm">
                     {replyingTo.isSticker ? <Sticker size={14} /> : <ImageIcon size={14} />} {replyingTo.isSticker ? 'Sticker' : 'GIF'}
                   </div>
-                ) : replyingTo.mediaUrl ? (
+                ) : getFullUrl(replyingTo.mediaUrl) ? (
                   <div className="flex items-center gap-1.5 text-slate-500 text-sm">
                     {replyingTo.mediaType === 'video' ? <PlayCircle size={14} /> : <ImageIcon size={14} />} {replyingTo.mediaType === 'video' ? 'Video' : 'Photo'}
                   </div>
