@@ -7,11 +7,15 @@ export interface ChatMessage {
   gifUrl?: string;
   gifAspect?: number;
   isSticker?: boolean;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video';
   replyTo?: {
     id: string;
     text: string;
     sender: string;
     gifUrl?: string;
     isSticker?: boolean;
+    mediaUrl?: string;
+    mediaType?: 'image' | 'video';
   };
 }

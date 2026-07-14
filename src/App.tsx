@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Send, Users, ChevronRight, MessageSquare, Shield, Zap, Image as ImageIcon, Sticker, Reply, X } from 'lucide-react';
+import { Send, Users, ChevronRight, MessageSquare, Shield, Zap, Image as ImageIcon, Sticker, Reply, X, Paperclip, Loader2, PlayCircle, Trash2 } from 'lucide-react';
 import { motion, useAnimation, PanInfo } from 'motion/react';
 import { ChatMessage } from './types';
 import { GifPicker } from './components/GifPicker';
@@ -30,6 +30,12 @@ export default function App() {
   const [onlineCount, setOnlineCount] = useState<number>(0);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+
+  const handleDeleteMessage = (messageId: string) => {
+    if (!socket || !isConnected) return;
+    socket.emit('delete_message', messageId);
+    setMessages((prev) => prev.filter(m => m.id !== messageId));
+  };
 
   const handleReply = (msg: ChatMessage) => {
     setReplyingTo(msg);
@@ -60,6 +66,9 @@ export default function App() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [maximizedMedia, setMaximizedMedia] = useState<{url: string, type: string} | null>(null);
 
   // Save messages to local storage whenever they change
   useEffect(() => {
@@ -97,6 +106,10 @@ export default function App() {
       setOnlineCount(count);
     });
 
+    newSocket.on('message_deleted', (messageId: string) => {
+      setMessages((prev) => prev.filter(m => m.id !== messageId));
+    });
+
     newSocket.on('new_message', (message: ChatMessage) => {
       // Use functional state update to ensure we always append to latest state
       setMessages((prev) => {
@@ -132,6 +145,8 @@ export default function App() {
         sender: replyingTo.sender,
         gifUrl: replyingTo.gifUrl,
         isSticker: replyingTo.isSticker,
+        mediaUrl: replyingTo.mediaUrl,
+        mediaType: replyingTo.mediaType,
       } : undefined
     };
 
@@ -141,6 +156,75 @@ export default function App() {
     setReplyingTo(null);
     inputRef.current?.focus();
   };
+
+  
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 1024 * 1024) {
+      alert('File size must be under 1MB');
+      e.target.value = '';
+      return;
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('media', file);
+
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
+      const res = await fetch(`${backendUrl}/api/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        let errMsg = 'Upload failed';
+        try {
+          const errData = await res.json();
+          errMsg = errData.error || errMsg;
+        } catch(e) {}
+        throw new Error(errMsg);
+      }
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error('Invalid JSON response:', text.substring(0, 200));
+        throw new Error('Server returned invalid response');
+      }
+
+      const newMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        text: '',
+        sender: username,
+        timestamp: Date.now(),
+        mediaUrl: data.url,
+        mediaType: data.type,
+        replyTo: replyingTo ? {
+          id: replyingTo.id,
+          text: replyingTo.text,
+          sender: replyingTo.sender,
+          gifUrl: replyingTo.gifUrl,
+          isSticker: replyingTo.isSticker,
+          mediaUrl: replyingTo.mediaUrl,
+          mediaType: replyingTo.mediaType,
+        } : undefined
+      };
+
+      socket?.emit('send_message', newMsg);
+      setReplyingTo(null);
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert('Failed to upload file');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
 
   const handleSendMedia = (media: { url: string; aspect: number; isSticker?: boolean }) => {
     if (!socket || !isConnected) return;
@@ -159,6 +243,8 @@ export default function App() {
         sender: replyingTo.sender,
         gifUrl: replyingTo.gifUrl,
         isSticker: replyingTo.isSticker,
+        mediaUrl: replyingTo.mediaUrl,
+        mediaType: replyingTo.mediaType,
       } : undefined
     };
 
@@ -285,7 +371,7 @@ export default function App() {
         ) : (
           messages.map((msg) => {
             const isMe = msg.isSelf;
-            const isGif = !!msg.gifUrl;
+            const isGif = !!msg.gifUrl || !!msg.mediaUrl;
             return (
               <motion.div 
                 key={msg.id} 
@@ -312,12 +398,21 @@ export default function App() {
                    </button>
                 )}
 
+                {isMe && (
+                  <button 
+                    onClick={() => handleDeleteMessage(msg.id)}
+                    className="flex p-1.5 rounded-full bg-slate-200 text-slate-500 hover:text-red-500 md:opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Delete message"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
                 <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                  {!isGif && (
-                    <span className="text-xs text-slate-500 mb-1 sm:mb-1.5 px-1 font-medium">
+                  <div className="flex items-center gap-2 mb-1 sm:mb-1.5 px-1 w-full justify-end">
+                    <span className="text-xs text-slate-500 font-medium">
                       {msg.sender}
                     </span>
-                  )}
+                  </div>
                   <div 
                     className={
                       isGif 
@@ -336,6 +431,10 @@ export default function App() {
                           <div className="flex items-center gap-2 text-xs">
                              {msg.replyTo.isSticker ? <Sticker size={14} /> : <ImageIcon size={14} />} {msg.replyTo.isSticker ? 'Sticker' : 'GIF'}
                           </div>
+                        ) : msg.replyTo.mediaUrl ? (
+                          <div className="flex items-center gap-2 text-xs">
+                             {msg.replyTo.mediaType === 'video' ? <PlayCircle size={14} /> : <ImageIcon size={14} />} {msg.replyTo.mediaType === 'video' ? 'Video' : 'Photo'}
+                          </div>
                         ) : (
                           <div className="truncate max-w-[200px] text-xs opacity-90">{msg.replyTo.text}</div>
                         )}
@@ -346,7 +445,25 @@ export default function App() {
                         className={`rounded-md overflow-hidden ${msg.isSticker ? '' : 'bg-slate-800/10'}`}
                         style={{ aspectRatio: msg.gifAspect || 1, minWidth: '150px', maxWidth: '300px' }}
                       >
-                        <img src={msg.gifUrl} alt={msg.isSticker ? 'Sticker' : 'GIF'} className={`w-full h-full ${msg.isSticker ? 'object-contain drop-shadow-md' : 'object-cover'}`} />
+                        <img 
+                          src={msg.gifUrl} 
+                          alt={msg.isSticker ? 'Sticker' : 'GIF'} 
+                          className={`w-full h-full ${msg.isSticker ? 'object-contain drop-shadow-md' : 'object-cover'} cursor-pointer hover:opacity-90 transition-opacity`}
+                          onClick={() => setMaximizedMedia({url: msg.gifUrl!, type: 'image'})}
+                        />
+                      </div>
+                    ) : msg.mediaUrl ? (
+                      <div className="rounded-md overflow-hidden bg-slate-800/10" style={{ minWidth: '150px', maxWidth: '300px' }}>
+                        {msg.mediaType === 'video' ? (
+                          <video src={msg.mediaUrl} controls className="w-full h-auto max-h-[400px] object-contain" />
+                        ) : (
+                          <img 
+                            src={msg.mediaUrl} 
+                            alt="Upload" 
+                            className="w-full h-auto max-h-[400px] object-contain cursor-pointer hover:opacity-90 transition-opacity" 
+                            onClick={() => setMaximizedMedia({url: msg.mediaUrl!, type: 'image'})}
+                          />
+                        )}
                       </div>
                     ) : (
                       <p className="leading-relaxed whitespace-pre-wrap break-words">
@@ -392,6 +509,10 @@ export default function App() {
                   <div className="flex items-center gap-1.5 text-slate-500 text-sm">
                     {replyingTo.isSticker ? <Sticker size={14} /> : <ImageIcon size={14} />} {replyingTo.isSticker ? 'Sticker' : 'GIF'}
                   </div>
+                ) : replyingTo.mediaUrl ? (
+                  <div className="flex items-center gap-1.5 text-slate-500 text-sm">
+                    {replyingTo.mediaType === 'video' ? <PlayCircle size={14} /> : <ImageIcon size={14} />} {replyingTo.mediaType === 'video' ? 'Video' : 'Photo'}
+                  </div>
                 ) : (
                   <p className="text-sm text-slate-600 truncate">{replyingTo.text}</p>
                 )}
@@ -418,6 +539,21 @@ export default function App() {
               <Sticker size={20} />
             </button>
             <input
+              type="file"
+              accept="image/*,video/*"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!isConnected || uploading}
+              className="p-2 sm:p-2.5 rounded-full text-slate-500 hover:text-slate-700 hover:bg-slate-200 disabled:opacity-50 transition-colors"
+              title="Send Photo/Video"
+            >
+              {uploading ? <Loader2 size={20} className="animate-spin" /> : <Paperclip size={20} />}
+            </button>
+            <input
               ref={inputRef}
               type="text"
               value={inputText}
@@ -438,6 +574,39 @@ export default function App() {
           </form>
         </div>
       </footer>
+
+      {maximizedMedia && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 sm:p-8 backdrop-blur-sm"
+          onClick={() => setMaximizedMedia(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMaximizedMedia(null);
+            }}
+          >
+            <X size={24} />
+          </button>
+          {maximizedMedia.type === 'video' ? (
+            <video 
+              src={maximizedMedia.url} 
+              controls 
+              autoPlay
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" 
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <img 
+              src={maximizedMedia.url} 
+              alt="Maximized" 
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" 
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

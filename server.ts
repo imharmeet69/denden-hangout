@@ -5,6 +5,31 @@ import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
+import fs from 'fs';
+import multer from 'multer';
+
+// ensure /tmp/uploads exists
+const uploadDir = path.join('/tmp', 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Multer setup
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir)
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+    const ext = path.extname(file.originalname);
+    cb(null, file.fieldname + '-' + uniqueSuffix + ext)
+  }
+})
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+});
 
 async function startServer() {
   const app = express();
@@ -87,6 +112,18 @@ async function startServer() {
     console.log(`User ${socket.id} joined ${shard} and ${deviceRoom}. Users in shard: ${shardCounts.get(shard)}`);
 
     // Handle messages
+    socket.on('delete_message', (messageId) => {
+      const history = shardMessages.get(shard);
+      if (history) {
+        const msgIndex = history.findIndex(m => m.id === messageId);
+        if (msgIndex !== -1 && history[msgIndex].deviceId === socket.handshake.auth?.deviceId) {
+          history.splice(msgIndex, 1);
+          io.to(shard).emit('message_deleted', messageId);
+        }
+      }
+    });
+
+    // Handle messages
     socket.on('send_message', (payload) => {
       // Create a clean payload with only safe data
       const cleanPayload = {
@@ -97,6 +134,8 @@ async function startServer() {
         gifUrl: payload.gifUrl,
         gifAspect: payload.gifAspect,
         isSticker: payload.isSticker,
+        mediaUrl: payload.mediaUrl,
+        mediaType: payload.mediaType,
         replyTo: payload.replyTo
       };
 
@@ -228,6 +267,37 @@ async function startServer() {
       res.status(500).json({ error: 'Internal server error' });
     }
   });
+
+  // Media Upload Route
+  app.post('/api/upload', (req, res) => {
+    upload.single('media')(req, res, (err) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+           return res.status(400).json({ error: err.message });
+        }
+        return res.status(500).json({ error: 'Unknown upload error' });
+      }
+      
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded or file too large.' });
+    }
+    
+    const fileUrl = `/api/uploads/${req.file.filename}`;
+    const fileType = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+
+    // Delete file after 2 hours (2 * 60 * 60 * 1000 = 7200000)
+    setTimeout(() => {
+      fs.unlink(req.file!.path, (err) => {
+        if (err) console.error(`Error deleting file ${req.file!.path}:`, err);
+        else console.log(`Deleted file ${req.file!.path} after 2 hours.`);
+      });
+    }, 7200000);
+
+    res.json({ url: fileUrl, type: fileType });
+    });
+  });
+
+  app.use('/api/uploads', express.static(uploadDir));
 
   // Vite integration
   if (process.env.NODE_ENV !== 'production') {
